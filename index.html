@@ -36,6 +36,10 @@ header h1 span{color:var(--accent)}
   background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
 .field{display:flex;flex-direction:column;gap:5px;flex:1 1 190px;min-width:150px}
 .field.search{flex:2 1 300px}
+.field.age{flex:0 1 190px}
+.agebox{display:flex;gap:8px}
+.agebox select{flex:0 0 58px;padding-left:8px;padding-right:4px}
+.agebox input{flex:1 1 auto;width:100%;min-width:0}
 label{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
 input,select,button{font:inherit;color:var(--text);background:var(--bg);
   border:1px solid var(--line);border-radius:9px;padding:9px 11px;outline:none}
@@ -129,6 +133,18 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
       <label for="country">País</label>
       <select id="country"><option value="">Todos</option></select>
     </div>
+    <div class="field age">
+      <label for="agenum">Idade</label>
+      <div class="agebox">
+        <select id="ageop" aria-label="Operador da idade">
+          <option value="lt">&lt;</option>
+          <option value="eq">=</option>
+          <option value="gt">&gt;</option>
+        </select>
+        <input id="agenum" type="number" min="0" max="120" inputmode="numeric"
+               placeholder="idade" autocomplete="off">
+      </div>
+    </div>
     <div class="field" style="flex:0 0 auto;justify-content:flex-end">
       <label>&nbsp;</label>
       <button class="ghost" id="reset" type="button">Limpar</button>
@@ -219,6 +235,7 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
 
   var qEl=document.getElementById("q"), sexEl=document.getElementById("sex"),
       cEl=document.getElementById("country"),
+      ageOpEl=document.getElementById("ageop"), ageNumEl=document.getElementById("agenum"),
       tbody=document.getElementById("tbody"), empty=document.getElementById("empty"),
       countEl=document.getElementById("count"), shownEl=document.getElementById("shown"),
       filterEl=document.getElementById("activefilter"),
@@ -266,10 +283,16 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
 
   var filtered=[], rendered=0, timer=null;
 
-  function matches(i,q,sx,co,bib){
+  function matches(i,q,sx,co,bib,ageOp,ageVal){
     if (bib > 0 && R[i][1]!==bib) return false;
     if (sx && D.sex[R[i][5]]!==sx) return false;
     if (co >= 0 && R[i][9]!==co) return false;
+    if (ageVal !== null){
+      var a = R[i][4];
+      if (ageOp === "lt" && !(a < ageVal)) return false;
+      if (ageOp === "eq" && !(a === ageVal)) return false;
+      if (ageOp === "gt" && !(a > ageVal)) return false;
+    }
     if (q && names[i].indexOf(q)===-1) return false;
     return true;
   }
@@ -277,8 +300,12 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
   function search(){
     var q = norm(qEl.value.trim());
     var sx = sexEl.value, co = cEl.value==="" ? -1 : parseInt(cEl.value,10);
+    var raw = ageNumEl.value.trim();
+    var ageVal = raw==="" ? null : parseInt(raw,10);
+    if (ageVal !== null && (isNaN(ageVal) || ageVal < 0)) ageVal = null;
+    var ageOp = ageOpEl.value;
     filtered = [];
-    for (var i=0;i<R.length;i++) if (matches(i,q,sx,co,bibFilter)) filtered.push(i);
+    for (var i=0;i<R.length;i++) if (matches(i,q,sx,co,bibFilter,ageOp,ageVal)) filtered.push(i);
     countEl.textContent = filtered.length===R.length
       ? filtered.length.toLocaleString("pt-PT") + " atletas"
       : filtered.length.toLocaleString("pt-PT") + " de " + R.length.toLocaleString("pt-PT") + " atletas";
@@ -287,6 +314,7 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
     if (sx === "M") parts.push("homens");
     if (sx === "F") parts.push("mulheres");
     if (co >= 0) parts.push(D.country[D.naz[co]] || D.naz[co]);
+    if (ageVal !== null) parts.push("idade " + (ageOp==="lt"?"<":ageOp==="gt"?">":"=") + " " + ageVal + " anos");
     if (q) parts.push('nome \u201c' + qEl.value.trim() + '\u201d');
     filterEl.textContent = parts.length ? "Posições recalculadas para o filtro: " + parts.join(" · ") : "";
     render(true);
@@ -339,9 +367,14 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
   });
   sexEl.addEventListener("change",search);
   cEl.addEventListener("change",search);
+  ageOpEl.addEventListener("change",search);
+  ageNumEl.addEventListener("input",function(){
+    clearTimeout(timer); timer=setTimeout(search,200);
+  });
   moreBtn.addEventListener("click",function(){ render(false); });
   document.getElementById("reset").addEventListener("click",function(){
     qEl.value=""; sexEl.value=""; cEl.value=""; bibFilter=-1;
+    ageOpEl.value="lt"; ageNumEl.value="";
     Array.prototype.forEach.call(chipBox.querySelectorAll(".chip"), function(c){
       c.classList.remove("active"); c.setAttribute("aria-pressed","false");
     });
