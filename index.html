@@ -55,6 +55,7 @@ tbody tr:last-child td{border-bottom:none}
 tbody tr:hover{background:var(--hover)}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 .pos{font-weight:700;color:var(--accent)}
+.general{display:block;font-size:11px;font-weight:500;color:var(--muted);line-height:1.1}
 .athlete{font-weight:600;white-space:normal;min-width:210px}
 .muted{color:var(--muted)}
 .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--accent-soft);
@@ -71,6 +72,8 @@ tbody tr:hover{background:var(--hover)}
 .chip:hover{border-color:var(--accent);color:var(--accent)}
 .chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .chip.active span{color:rgba(255,255,255,.85)}
+.posnote{font-size:11px;color:var(--muted);margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0}
+.chips-empty{font-size:12px;color:var(--muted);font-style:italic}
 footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
 @media (max-width:640px){.wrap{padding:20px 10px 48px}.tablewrap{max-height:none}
   .credit{width:100%;justify-content:flex-start;padding-top:0}}
@@ -102,7 +105,12 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
     </div>
   </header>
 
-  <div class="chips" id="chips"><span class="chiplabel">Dorsais</span></div>
+      <div id="chipsbox">
+        <div class="chips" id="chips"><span class="chiplabel">Dorsais</span></div>
+        <div class="chips chips-empty" id="chipsmsg" hidden>
+          <span>Nenhum destes dorsais participou. Corrige os dorsais em <code>build_index.py</code>.</span>
+        </div>
+      </div>
 
   <section class="controls">
     <div class="field search">
@@ -129,6 +137,7 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
 
   <div class="status">
     <span id="count"></span>
+    <span id="activefilter" class="posnote"></span>
     <span id="shown"></span>
   </div>
 
@@ -136,7 +145,7 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
     <table>
       <thead>
         <tr>
-          <th class="num">Pos.</th>
+          <th class="num" title="Posição dentro do filtro ativo. Abaixo, em cinzento, a posição geral (#).">Pos.</th>
           <th class="num">Dorsal</th>
           <th>Atleta</th>
           <th class="num">Ano</th>
@@ -212,27 +221,34 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
       cEl=document.getElementById("country"),
       tbody=document.getElementById("tbody"), empty=document.getElementById("empty"),
       countEl=document.getElementById("count"), shownEl=document.getElementById("shown"),
+      filterEl=document.getElementById("activefilter"),
       moreBtn=document.getElementById("more");
 
   var FRIENDS = [
     {bib:31140, name:"António"},
-    {bib:2830,  name:"Vítor"},
+    {bib:2830,  name:"Vitor"},
     {bib:2527,  name:"Marcos"},
     {bib:23421, name:"Ana"},
     {bib:18110, name:"Eduardo"},
-    {bib:7271,  name:"Luís"},
+    {bib:7271,  name:"Luis"},
     {bib:12779, name:"Liliana"}
   ];
   var bibFilter = -1;
   var chipBox = document.getElementById("chips");
+  var chipMsg = document.getElementById("chipsmsg");
+  var byBib = {};
+  for (var k=0;k<R.length;k++) byBib[R[k][1]] = k;
+  var chipCount = 0;
   FRIENDS.forEach(function(f){
-    var full = "";
-    for (var k=0;k<R.length;k++){ if (R[k][1]===f.bib){ full = R[k][2]; break; } }
+    var idx = byBib[f.bib];
+    if (idx === undefined) return;
+    chipCount++;
+    var full = R[idx][2];
     var b = document.createElement("button");
     b.type = "button";
     b.className = "chip";
     b.setAttribute("aria-pressed","false");
-    b.title = full ? f.name + " — " + full : String(f.bib);
+    b.title = f.name + " — " + full;
     b.innerHTML = "<b>" + esc(f.name) + "</b><span>" + f.bib + "</span>";
     b.addEventListener("click", function(){
       bibFilter = (bibFilter === f.bib) ? -1 : f.bib;
@@ -246,6 +262,7 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
     });
     chipBox.appendChild(b);
   });
+  if (chipCount === 0){ chipBox.hidden = true; chipMsg.hidden = false; }
 
   var filtered=[], rendered=0, timer=null;
 
@@ -265,6 +282,13 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
     countEl.textContent = filtered.length===R.length
       ? filtered.length.toLocaleString("pt-PT") + " atletas"
       : filtered.length.toLocaleString("pt-PT") + " de " + R.length.toLocaleString("pt-PT") + " atletas";
+    var parts = [];
+    if (bibFilter > 0) parts.push("dorsal " + bibFilter);
+    if (sx === "M") parts.push("homens");
+    if (sx === "F") parts.push("mulheres");
+    if (co >= 0) parts.push(D.country[D.naz[co]] || D.naz[co]);
+    if (q) parts.push('nome \u201c' + qEl.value.trim() + '\u201d');
+    filterEl.textContent = parts.length ? "Posições recalculadas para o filtro: " + parts.join(" · ") : "";
     render(true);
   }
 
@@ -276,14 +300,18 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
 
   function render(reset){
     if (reset){ tbody.innerHTML=""; rendered=0; }
+    var active = filtered.length !== R.length;
     var end = Math.min(rendered+CHUNK, filtered.length);
     var frag = document.createDocumentFragment();
     for (var n=rendered;n<end;n++){
       var i=filtered[n], r=R[i];
       var tr=document.createElement("tr");
       var naz=D.naz[r[9]], cname=D.country[naz]||naz;
+      var posCell = active
+        ? (n+1) + '<span class="general">#' + esc(r[0]) + '</span>'
+        : esc(r[0]);
       tr.innerHTML =
-        '<td class="num pos">'+esc(r[0])+'</td>'+
+        '<td class="num pos">'+posCell+'</td>'+
         '<td class="num">'+esc(r[1])+'</td>'+
         '<td class="athlete">'+esc(r[2])+'</td>'+
         '<td class="num muted">'+esc(r[3])+'</td>'+
