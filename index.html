@@ -77,7 +77,6 @@ tbody tr:hover{background:var(--hover)}
 .chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .chip.active span{color:rgba(255,255,255,.85)}
 .posnote{font-size:11px;color:var(--muted);margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0}
-.chips-empty{font-size:12px;color:var(--muted);font-style:italic}
 footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
 @media (max-width:640px){.wrap{padding:20px 10px 48px}.tablewrap{max-height:none}
   .credit{width:100%;justify-content:flex-start;padding-top:0}}
@@ -111,9 +110,6 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
 
       <div id="chipsbox">
         <div class="chips" id="chips"><span class="chiplabel">Dorsais</span></div>
-        <div class="chips chips-empty" id="chipsmsg" hidden>
-          <span>Nenhum destes dorsais participou. Corrige os dorsais em <code>build_index.py</code>.</span>
-        </div>
       </div>
 
   <section class="controls">
@@ -252,14 +248,11 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
   ];
   var bibFilter = -1;
   var chipBox = document.getElementById("chips");
-  var chipMsg = document.getElementById("chipsmsg");
   var byBib = {};
   for (var k=0;k<R.length;k++) byBib[R[k][1]] = k;
-  var chipCount = 0;
   FRIENDS.forEach(function(f){
     var idx = byBib[f.bib];
     if (idx === undefined) return;
-    chipCount++;
     var full = R[idx][2];
     var b = document.createElement("button");
     b.type = "button";
@@ -279,7 +272,6 @@ footer{margin-top:26px;color:var(--muted);font-size:13px;text-align:center}
     });
     chipBox.appendChild(b);
   });
-  if (chipCount === 0){ chipBox.hidden = true; chipMsg.hidden = false; }
 
   var filtered=[], rendered=0, timer=null;
 
